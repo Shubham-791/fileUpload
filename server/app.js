@@ -64,18 +64,17 @@ app.post('/profile', upload.array('avatar', 2), function (req, res, next) {
 });
 app.get('/uploads', (req, res) => {
     const encodedImages = [];
-    fileModel.find({ "file.contentType": { $elemMatch: { $regex: /image/, $options: 'i' } } }, { "file.contentType": { $elemMatch: { $regex: /image/, $options: 'i' } } }, (err, result) => {
+    fileModel.find({ "file.contentType": { $elemMatch: { $regex: /image/, $options: 'i' } } }, 
+    { _id:0,"file.contentType.$": 1,"file.fileData":1 }, (err, result) => {
         if (err) {
             console.log('Error while querying files');
             return res.send('Error while querying ' + err);
         }
-        // console.log(result);
-        result.forEach((contentType, index) => {
-            console.log(contentType);
-            // if (contentType.startsWith('image')) {
-            //     encodedImages.push(result.file.fileData[index]);
-            // }
+        // console.log(result[0].file.contentType.length +' '+result[0].file.fileData.length);
+        result.forEach(({ file }, index) => {
+            encodedImages.push(...file.fileData);
         });
+        console.log('Length of Encoded Images is '+encodedImages.length);
         return res.send(encodedImages);
     })
 });
