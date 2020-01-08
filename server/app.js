@@ -16,6 +16,7 @@ app.use(bodyParser.json());
 app.use(morgan('dev'));
 app.use(express.static('public'));
 app.use(bodyParser.urlencoded({ extended: true }));
+global.counter = 0;
 mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true }, (err) => {
     if (err) {
         console.log('Error in Connection to DB');
@@ -28,12 +29,12 @@ mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopol
 const storage = multer.diskStorage({
     destination: path.join(__dirname + '/uploads'),
     filename: function (req, file, callback) {
-        crypto.pseudoRandomBytes(16, function (err, raw) {
-            if (err) return callback(err);
-            console.log(raw);
-            console.log(raw.toString('hex'));
-            callback(null, raw.toString('hex'), path.extname(file.originalname));
-        });
+        // crypto.pseudoRandomBytes(16, function (err, raw) {
+        //     if (err) return callback(err);
+        //     console.log(raw);
+        //     console.log(raw.toString('hex'));
+        // });
+        callback(null, global.counter++ + path.extname(file.originalname));
     }
 });
 const upload = multer({ storage });
@@ -46,8 +47,18 @@ app.post('/profile', upload.array('avatar', 2), function (req, res, next) {
     const host = req.host;
     // const filePath = req.protocol + "://" + host + '/' + req.file.path;
     const files = new fileModel({
+        file: {
+            contentType: [],
+            fileData: []
+        }
+    });
+    /*
+    mongoose doesn't throw error if we are initially having empty file object (sub document)and then try to access file empty object properties, 
+    ( Not Sure: Array properties are defaultly intialized as empty array)
+    const files = new fileModel({
         file: {}
     });
+    */
     req.files.forEach((file, index) => {
         fs.readFile(file.path, null, (err, data) => {
             if (err) {
@@ -64,17 +75,18 @@ app.post('/profile', upload.array('avatar', 2), function (req, res, next) {
 });
 app.get('/uploads', (req, res) => {
     const encodedImages = [];
-    fileModel.find({ "file.contentType": { $elemMatch: { $regex: /image/, $options: 'i' } } }, { "file.contentType": { $elemMatch: { $regex: /image/, $options: 'i' } } }, (err, result) => {
+    fileModel.find({}, (err, result) => {
         if (err) {
             console.log('Error while querying files');
             return res.send('Error while querying ' + err);
         }
-        // console.log(result);
-        result.forEach((contentType, index) => {
-            console.log(contentType);
-            // if (contentType.startsWith('image')) {
-            //     encodedImages.push(result.file.fileData[index]);
-            // }
+        console.log(result);
+        result.forEach(({ file }) => {
+            file.contentType.forEach((contentType, index) => {
+                if (contentType.startsWith('image')) {
+                    encodedImages.push(file.fileData[index]);
+                }
+            });
         });
         return res.send(encodedImages);
     })
@@ -89,4 +101,5 @@ function saveFiles(files, res) {
         }
     });
 }
-app.listen(3000, () => console.log('App is listening on port 3000'));
+const port = process.env.port || 3000;
+app.listen(port, () => console.log('App is listening on port ' + port));
